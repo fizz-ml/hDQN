@@ -1,0 +1,35 @@
+{
+    "setup"   :   {
+                "actor_path"          : "actor.py",
+                "critic_path"         : "critic.py"
+                },
+    "agent"   :   { 
+                "actor_path"          : "actor.mod", 
+                "critic_path"         : "critic.mod",
+                "buffer_size"         : 1000000,
+                "gamma"               : 1,
+                "actor_alpha"         : 0.001,
+                "critic_alpha"        : 0.001,
+                "actor_iter_count"    : 1,
+                "critic_iter_count"   : 1,
+                "batch_size"          : 32,
+                "auxiliary_losses"    :
+                    {
+                    } 
+                },
+
+    "train"   :   {
+                "steps" : 500000,
+                "prefill" : 100000
+                },
+
+    "test"    :   {
+                "steps" : 10000
+                },
+
+    "env"     :   {
+                "name" : "MountainCarContinuous-v0",
+                "action_dim"    :   1, 
+                "state_dim"     :   1
+                }
+}
