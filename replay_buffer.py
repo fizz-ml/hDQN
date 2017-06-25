@@ -87,7 +87,7 @@ class ExperienceReplay(ReplayBuffer):
         '''
         return s_t, a_t, r_t, s_t1, done, act_dur
 
-    def _put(self, s_t, a_t, reward, done, act_dur = 1):
+    def put(self, s_t, a_t, reward, done, act_dur = 1):
         self.actions[self.current_index] = a_t
         self.states[self.current_index] = s_t
         self.rewards[self.current_index] = reward

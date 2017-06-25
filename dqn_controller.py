@@ -22,28 +22,9 @@ BATCH_SIZE = 100
 EPSILON = 0.01
 
 class DQNController:
-    """An agent that implements the DDPG algorithm
-
-    An agent that implements the deep deterministic
-    policy gradient algorithm for continuous control.
-    A description of the algorithm can be found at
-    https://arxiv.org/pdf/1509.02971.pdf.
-
-    The agent stores a replay buffer along with
-    two models of the data, an actor and a critic.
-
+    """
     Attributes:
-        auxiliary_losses: The list of enabled
-        auxiliary rewards for this agent
-
-        actor: The actor model that takes a state
-        and returns a new action.
-
-        critic: The critic model that takes a state
-        and an action and returns the expected
-        reward
-
-        replay_buffer: The DDPGAgent replay buffer
+           replay_buffer: The DDPGAgent replay buffer
     """
 
     """
@@ -60,17 +41,17 @@ class DQNController:
         return self.replay_buffer
     """
 
-    def __init__(self,actor_path, critic_path,
+    def __init__(self,
+            subroutines,
+            critic_path,
             state_size = 1,
             action_size = 1,
             buffer_size = REPLAY_BUFFER_SIZE,
             gamma = DISCOUNT_FACTOR,
-            actor_alpha = LEARNING_RATE_ACTOR,
-            critic_alpha = LEARNING_RATE_CRITIC,
-            actor_iter_count = ACTOR_ITER_COUNT,
-            critic_iter_count = CRITIC_ITER_COUNT,
+            alpha = LEARNING_RATE_CRITIC,
+            iter_count = CRITIC_ITER_COUNT,
             batch_size = BATCH_SIZE,
-            auxiliary_losses = {}):
+            ):
         """Constructor for the DDPG_agent
 
         Args:
@@ -95,30 +76,28 @@ class DQNController:
         self.replay_buffer = ExperienceReplay(state_size, action_size, buffer_size)
         #TODO
 
+        self._caller = caller
+
         #initialize parameters
         self.epsilon = 0.35
-        self._actor_alpha = actor_alpha
-        self._critic_alpha = critic_alpha
-        self._actor_iter_count = actor_iter_count
-        self._critic_iter_count = critic_iter_count
+        self._alpha = alpha
+        self.iter_count = iter_count
         self._gamma = gamma
         self._batch_size = batch_size
         self._state_size = state_size
         self._action_size = action_size
 
         #Specify model locations
-        self._actor_path = actor_path
         self._critic_path = critic_path
 
         #initialize models
         self.load_models()
 
         #Initialize optimizers
-        self._actor_optimizer = opt.Adam(self.actor.parameters(), lr=self._actor_alpha)
         self._critic_optimizer = opt.Adam(self.critic.parameters(), lr=self._critic_alpha)
 
 
-    def train(self):
+    def train(self, q_caller = None):
         """Trains the agent for a bit.
 
             Args:
@@ -194,8 +173,11 @@ class DQNController:
                 The next action that the agent with the given
                 agent_id will carry out given the current state
         """
+        tot_r = 0
+        dur = 0
         while True:
             cur_action = None
+            cur_state = env.cur_obs
             if is_test:
                 a, _ = self.actor.forward(upcast(np.expand_dims(cur_state,axis=0)),[])
                 cur_action = a.data.cpu().numpy()
@@ -205,14 +187,26 @@ class DQNController:
                 a, _ = self.actor.forward(upcast(np.expand_dims(cur_state,axis=0)),[])
                 cur_action = a.data.cpu().numpy()
 
-            s_next, r, done = env.next_obs(a)
 
-            self.replay_buffer.put_act(cur_state,cur_action)
+            self.replay_buffer.put(cur_state, cur_action, r, done)
 
-        return cur_action
+            tot_r += r
+            dur += 1
 
-    def log_reward(self,reward,is_done):
-            self.replay_buffer.put_rew(reward,is_done)
+        return tot_r, dur, done
+
+    def execute_action(self, env, a):
+        # A real actual action
+        if a < action_size:
+            _, r, done = env.next_obs(a)
+            dur = 1
+
+        # A subroutine call
+        else:
+            sub_idx = a - action_size
+            r, dur, done = subcontrollers[sub_idx].act(env)
+
+        return r, dur, done
 
     def save_models(self, locations=None):
         """Save the model to a given locations
