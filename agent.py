@@ -5,14 +5,6 @@ class Agent:
             auxillary_rewards: The list of enabled
             auxillary rewards for this agent
     """
-    @property
-    def auxiliary_rewards(self):
-        return self.auxiliary_losses
-    
-    def __init__(self, auxiliary_losses):
-       self.auxiliary_losses = auxiliary_losses
-       # TODO: Implement auxiliary module instantiation
-
     def train():
         """Trains the agent for a bit.
 

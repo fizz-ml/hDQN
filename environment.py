@@ -77,7 +77,7 @@ class GymEnvironment(Environment):
 
     @property
     def action_size(self):
-        return self.env.action_space.shape
+        return (self.env.action_space.n,)
 
     @property
     def obs_size(self):
