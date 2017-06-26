@@ -152,11 +152,35 @@ class DQNController:
         # TODO: Freeze less often
         self._target_critic.load_state_dict(self.critic.state_dict())
 
-
-
     def act(self,
             env,
+            caller_id,
             is_test=False):
+        # Keep track of total reward and duration
+        tot_r = 0
+        tot_dur = 0
+
+        while True:
+            # Forward step
+            cur_state = env.cur_obs
+            cur_action = self.choose_action(cur_state, is_test)
+            r, dur, done, ret = self.execute_action(env, cur_action)
+
+            # Store the tuple in replay
+            self.replay_buffer.put(cur_state, cur_action, r, done, dur, caller_id)
+
+            # Update totals
+            tot_r += r
+            tot_dur += dur
+
+            # End if episode end or return action called
+            if done or ret:
+                break
+
+        # Return control to caller
+        return tot_r, dur, done
+
+    def choose_action(self, cur_state, is_test=False):
         """Get the next action from the agent.
 
             Takes a state,reward and possibly auxiliary reward
@@ -173,40 +197,42 @@ class DQNController:
                 The next action that the agent with the given
                 agent_id will carry out given the current state
         """
-        tot_r = 0
-        dur = 0
-        while True:
-            cur_action = None
-            cur_state = env.cur_obs
-            if is_test:
-                a, _ = self.actor.forward(upcast(np.expand_dims(cur_state,axis=0)),[])
-                cur_action = a.data.cpu().numpy()
-            elif random.random() < self.epsilon:
-                cur_action = np.expand_dims(np.random.randn(self._action_size),axis=0)
-            else:
-                a, _ = self.actor.forward(upcast(np.expand_dims(cur_state,axis=0)),[])
-                cur_action = a.data.cpu().numpy()
 
+        cur_action = None
+        if is_test:
+            a, _ = self.actor.forward(upcast(np.expand_dims(cur_state,axis=0)),[])
+            cur_action = a.data.cpu().numpy()
 
-            self.replay_buffer.put(cur_state, cur_action, r, done)
+        elif random.random() < self.epsilon:
+            cur_action = np.expand_dims(np.random.randn(self._action_size),axis=0)
 
-            tot_r += r
-            dur += 1
+        else:
+            a, _ = self.actor.forward(upcast(np.expand_dims(cur_state,axis=0)),[])
+            cur_action = a.data.cpu().numpy()
 
-        return tot_r, dur, done
+        return cur_action
 
     def execute_action(self, env, a):
-        # A real actual action
-        if a < action_size:
+        ret = False
+
+        # Return control to caller
+        if a == 0:
+            r = 0
+            dur = 0
+            done = False
+            ret = True
+
+        # Perform real actual action
+        elif a < action_size + 1:
             _, r, done = env.next_obs(a)
             dur = 1
 
-        # A subroutine call
+        # Make a subroutine call
         else:
-            sub_idx = a - action_size
+            sub_idx = a - (action_size + 1)
             r, dur, done = subcontrollers[sub_idx].act(env)
 
-        return r, dur, done
+        return r, dur, done, ret
 
     def save_models(self, locations=None):
         """Save the model to a given locations
