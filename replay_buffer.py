@@ -41,10 +41,10 @@ class ExperienceReplay(ReplayBuffer):
         self.states = np.empty((self.capacity, self.state_size), dtype = np.float16)
         self.rewards = np.empty(self.capacity, dtype = np.float16)
         self.dones = np.empty(self.capacity, dtype = np.bool)
+        self.caller_ids = np.empty(self.capacity, dtype = np.uint8)
         self.act_durs = np.empty(self.capacity, dtype = np.float16)
 
         self.current_index = 0
-        self.staged = False
 
     def batch_sample(self, batch_size):
         """ Sample a batch of experiences from the replay.
@@ -77,6 +77,7 @@ class ExperienceReplay(ReplayBuffer):
         r_t = np.expand_dims(self.rewards[idxs], axis = 1)
         done = self.dones[idxs]
         act_dur = self.act_durs[idxs]
+        caller_id = self.caller_ids[idxs]
 
         '''
         j = 0
@@ -85,61 +86,16 @@ class ExperienceReplay(ReplayBuffer):
         print(s_t[j], s_t1[j], a_t[j], r_t[j], done[j])
         raw_input("Press Enter to continue...")
         '''
-        return s_t, a_t, r_t, s_t1, done, act_dur
+        return s_t, a_t, r_t, s_t1, done, act_dur, caller_id
 
-    def put(self, s_t, a_t, reward, done, act_dur = 1):
+    def put(self, s_t, a_t, reward, done, act_dur, caller_id):
         self.actions[self.current_index] = a_t
         self.states[self.current_index] = s_t
         self.rewards[self.current_index] = reward
         self.dones[self.current_index] = done
+        self.caller_ids[self.current_index] = caller_id
         self.act_durs[self.current_index] = act_dur
         self._icrement_index()
-
-    def put_act(self, s_t, a_t):
-        """ Puts the current state and the action taking into Experience Replay.
-        Args:
-            s_t:        Current state.
-            a_t:        Action taking at this state.
-        Raises:
-            IOError:    If trying to overwrite previously staged action and state.
-        """
-        if not self.staged:
-            self.actions[self.current_index] = a_t
-            self.states[self.current_index] = s_t
-            # stage to prevent double staging
-            self.staged = True
-        else:
-            # already staged an action and state
-            raise IOError('Trying to override previously staged action and state.')
-
-    def put_rew(self, reward, done, act_dur = 1):
-        """ Completes a staged insertion by adding reward and
-            terminal signal to Experience Replay
-        Args:
-            reward:     Reward received in this step.
-            done:       Bool signalling terminal step.
-        Raises:
-            IOError:    If trying to complete insertion without having staged first.
-        """
-        if(self.staged):
-            self.rewards[self.current_index] = reward
-            self.dones[self.current_index] = done
-            self.act_durs[self.current_index] = act_dur
-            # unstage and increment index
-            self.staged = False
-            self._increment_index()
-        else:
-            # not yet staged state and action
-            raise IOError(  'Trying to complete unstaged insertion. Must insert action and state first.')
-
-    def unstage(self):
-        """ Unstages any currently staged insertion
-        """
-        if(self.staged):
-            # stage to prevent double staging
-            self.staged = False
-            self.actions[self.current_index] = None
-            self.states[self.current_index] = None
 
     def _increment_index(self):
         self.current_index = (self.current_index + 1) % self.capacity
