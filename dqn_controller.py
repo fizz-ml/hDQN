@@ -41,17 +41,7 @@ class DQNController:
         return self.replay_buffer
     """
 
-    def __init__(self,
-            subroutines,
-            critic_path,
-            state_size = 1,
-            action_size = 1,
-            buffer_size = REPLAY_BUFFER_SIZE,
-            gamma = DISCOUNT_FACTOR,
-            alpha = LEARNING_RATE_CRITIC,
-            iter_count = CRITIC_ITER_COUNT,
-            batch_size = BATCH_SIZE,
-            ):
+    def __init__(self, config, controllers, env):
         """Constructor for the DDPG_agent
 
         Args:
@@ -77,6 +67,9 @@ class DQNController:
         #TODO
 
         self._caller = caller
+        subcontroller_idxs = config[""]
+        for idx in config
+            self.subcontrollers = []
 
         #initialize parameters
         self.epsilon = 0.35
@@ -95,7 +88,6 @@ class DQNController:
 
         #Initialize optimizers
         self._critic_optimizer = opt.Adam(self.critic.parameters(), lr=self._critic_alpha)
-
 
     def train(self, q_caller = None):
         """Trains the agent for a bit.
@@ -183,19 +175,14 @@ class DQNController:
     def choose_action(self, cur_state, is_test=False):
         """Get the next action from the agent.
 
-            Takes a state,reward and possibly auxiliary reward
-            tuple and returns the next action from the agent.
+            Takes a state and returns the next action from the agent.
             The agent may cache the reward and state
 
             Args:
                 cur_state: The current state of the enviroment
-                prev_reward: The previous reward from the enviroment
-                is_done: Signals if a given episode is done.
                 is_test: Check to see if the agent is done
-                agent_id=None
             Returns:
-                The next action that the agent with the given
-                agent_id will carry out given the current state
+                The next action
         """
 
         cur_action = None
@@ -212,7 +199,7 @@ class DQNController:
 
         return cur_action
 
-    def execute_action(self, env, a):
+    def execute_action(self, env, a, is_test):
         ret = False
 
         # Return control to caller
@@ -230,7 +217,7 @@ class DQNController:
         # Make a subroutine call
         else:
             sub_idx = a - (action_size + 1)
-            r, dur, done = subcontrollers[sub_idx].act(env)
+            r, dur, done = subcontrollers[sub_idx].act(env, self._id, self.)
 
         return r, dur, done, ret
 
