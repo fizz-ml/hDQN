@@ -28,7 +28,7 @@ class Runner:
 
         episodes = train_config['episodes']
         for ep in range(episodes):
-            controllers[0].act(self.env)
+            controllers[0].act(self.env,0)
         
         for c in controllers
             c.train(controllers)
