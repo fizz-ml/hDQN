@@ -90,8 +90,11 @@ class DQNController:
         #Specify model locations
         self._critic_path = critic_path
 
+        self._Q = create_model(config)
+
+
         #initialize models
-        self.load_models()
+        #self.load_models()
 
         #Initialize optimizers
         self._critic_optimizer = opt.Adam(self.critic.parameters(), lr=self._critic_alpha)
@@ -101,58 +104,40 @@ class DQNController:
         """Trains the agent for a bit.
 
             Args:
-                None
+                
             Returns:
                 None
         """
         self.epsilon = self.epsilon * 0.99992
+
+        #get argmax_a' Q(s,a')
+        
+        s_t,a_t,r_t,s_t1,done,act_dur= self.replay_buffer.batch_sample(self._batch_size)
+
+        
+        loss_total = 0
+        argmax_t = np.empty((self._batch_size,1))
+        for j in range(self._batch_size):
+            
+            argmax = 0
+            for i in range(self._action_size):
+                if (self._Q.forward(s_next, i)> self._Q.forward(s_next, argmax)):
+                    argmax_t[j,1] = i
+
+                    #CONCAT STATE ACTIONS
+
+
+
+        #DQN loss
+        loss = torch.nn.loss(self._Q.forward(s_t, a_t), r_t +  self._Q(s_t1,argmax_t)) #ADD OPTIMIZER
+        self._optimizer.zero_grad()
+        loss.backward(self._Q.parameters())
+        self._optimizer.step()
+
+        
+
         #update_critic
-        for i in range(self._critic_iter_count):
-            s_t, a_t, r_t, s_t1, done = self.replay_buffer.batch_sample(self._batch_size)
-            done = upcast(done)
-            s_t = upcast(s_t)
-            a_t = upcast(a_t)
-            s_t1 = upcast(s_t1)
-            r_t = upcast(r_t)
-            a_t1, _ = self.actor.forward(s_t1,[])
-            critic_target = r_t + self._gamma*(1-done)*self._target_critic.forward(s_t1,a_t1)
-            td_error = (self.critic.forward(s_t,a_t)-critic_target)**2
-
-            #preform one optimization update
-            self._critic_optimizer.zero_grad()
-            mean_td_error = torch.mean(td_error)
-            mean_td_error.backward()
-            self._critic_optimizer.step()
-
-
-        #update_actor
-        for i in range(self._actor_iter_count):
-            s_t, a_t, r_t, s_t1, done = self.replay_buffer.batch_sample(self._batch_size)
-            done = upcast(done)
-            s_t = upcast(s_t)
-            a_t = upcast(a_t)
-            s_t1 = upcast(s_t1)
-            r_t = upcast(r_t)
-            a_t1,aux_actions = self.actor.forward(s_t1,self.auxiliary_losses.keys())
-            expected_reward = self.critic.forward(s_t1,a_t1)
-
-            total_loss = -1*expected_reward
-            for key,aux_reward_tuple in self.auxiliary_losses.items():
-                aux_weight,aux_module = aux_reward_tuple
-                total_loss += aux_weight*aux_module(aux_actions[key],s_t,a_t,r_t,s_t1,a_t1)
-
-            mean_loss = torch.mean(total_loss)
-
-            #print('LOSS:', mean_loss, 'Eps', self.epsilon)
-            #preform one optimization update
-            self._actor_optimizer.zero_grad()
-            mean_loss.backward()
-            self._actor_optimizer.step()
-
-        # TODO: Freeze less often
-        self._target_critic.load_state_dict(self.critic.state_dict())
-
-
+        
 
     def act(self,
             env,
