@@ -64,11 +64,17 @@ class DQNController:
 
         #Initialize experience replay buffer
         self.replay_buffer = ExperienceReplay(state_size, action_size, buffer_size)
-        #TODO
+        #TODO make sure config has these things
+        
+        #parent id
+        self._parent_ids = config['parent_ids'] #value of -1 indicates tree root  #subcontroller ids
+        subcontroller_ids = config['subcontroller_ids']
+        if subcontroller_ids = None:
+            self._true_actor = True
+        else:
+            self._true_actor = False
 
-        self._caller = caller
-        subcontroller_idxs = config[""]
-        for idx in config
+        for idx in subcontroller_ids:
             self.subcontrollers = []
 
         #initialize parameters
@@ -76,21 +82,25 @@ class DQNController:
         self._alpha = alpha
         self.iter_count = iter_count
         self._gamma = gamma
-        self._batch_size = batch_size
-        self._state_size = state_size
-        self._action_size = action_size
-
+        #TODO: config should have batch_size
+        self._batch_size = config['batch_size']
+        self._state_size = env.obs_size()
+       
+        if(self._true_actor):
+            self._action_size = env.action_size() + 1
+        else:
+            self._action_size = len(subcontroller_ids) + 1 
         #Specify model locations
         self._critic_path = critic_path
 
-        self._Q = create_model(config)
+        self._Q = create_model(self._state_size, self._action_size, config['model_config']) #TODO merge these  config-like params nicely        
 
 
         #initialize models
         #self.load_models()
 
         #Initialize optimizers
-        self._critic_optimizer = opt.Adam(self.critic.parameters(), lr=self._critic_alpha)
+        self._Q_optimizer = opt.Adam(self._Q.parameters(), lr=self._alpha)
 
     def train(self, q_caller = None):
         """Trains the agent for a bit.
@@ -100,14 +110,14 @@ class DQNController:
             Returns:
                 None
         """
-        self.epsilon = self.epsilon * 0.99992
+        self.epsilon = self.epsilon * 0.99992 #TODO prove this is optimal
 
 
         #get argmax_a' Q(s,a')
         
         s_t,a_t,r_t,s_t1,done,act_dur= self.replay_buffer.batch_sample(self._batch_size)
 
-        
+        '''
         loss_total = 0
         argmax_t = np.empty((self._batch_size,1))
         for j in range(self._batch_size):
@@ -119,10 +129,10 @@ class DQNController:
 
                     #CONCAT STATE ACTIONS
 
-
+        '''
 
         #DQN loss
-        loss = torch.nn.loss(self._Q.forward(s_t, a_t), r_t +  self._Q(s_t1,argmax_t)) #ADD OPTIMIZER
+        loss = torch.nn.MSEloss(self._Q(s_t)[a_t], r_t +  np.max(self._Q.forward(s_t1),axis=1)) #ADD OPTIMIZER
         self._optimizer.zero_grad()
         loss.backward(self._Q.parameters())
         self._optimizer.step()
@@ -131,7 +141,9 @@ class DQNController:
 
         #update_critic
         
-
+    def set_controller_tree(controller_tree):
+        self._controller_tree = controller_tree
+    
     def act(self,
             env,
             caller_id,
@@ -172,24 +184,21 @@ class DQNController:
             Returns:
                 The next action
         """
-
+        #TODO: ensure Q network just returns Q(s,a) over all a
         cur_action = None
-        if is_test:
-            a, _ = self.actor.forward(upcast(np.expand_dims(cur_state,axis=0)),[])
-            cur_action = a.data.cpu().numpy()
-
-        elif random.random() < self.epsilon:
-            cur_action = np.expand_dims(np.random.randn(self._action_size),axis=0)
+        
+        if random.random() < self.epsilon and is_test == False:
+            cur_action = np.floor(np.expand_dims(np.random.randn(self._action_size),axis=0)).astype(int)
 
         else:
-            a, _ = self.actor.forward(upcast(np.expand_dims(cur_state,axis=0)),[])
+            a = np.argmax(self._Q.forward(upcast(np.expand_dims(cur_state,axis=0)),[]))     
             cur_action = a.data.cpu().numpy()
 
         return cur_action
 
     def execute_action(self, env, a, is_test):
         ret = False
-
+        #TODO: what to do when root controller
         # Return control to caller
         if a == 0:
             r = 0
@@ -198,14 +207,14 @@ class DQNController:
             ret = True
 
         # Perform real actual action
-        elif a < action_size + 1:
+        elif self._true_actor:
             _, r, done = env.next_obs(a)
             dur = 1
 
         # Make a subroutine call
         else:
-            sub_idx = a - (action_size + 1)
-            r, dur, done = subcontrollers[sub_idx].act(env, self._id, self.)
+            sub_idx = a - 1
+            r, dur, done = self._controller_tree[subcontrollers[sub_idx]].act(env, self._id, self.)
 
         return r, dur, done, ret
 
