@@ -101,7 +101,7 @@ class DQNController:
 
         #Initialize optimizers
         self._Q_optimizer = opt.Adam(self._Q.parameters(), lr=self._alpha)
-
+        self._is_root = config['is_root']#TODO
     def train(self, q_caller = None):
         """Trains the agent for a bit.
 
@@ -132,7 +132,7 @@ class DQNController:
         '''
 
         #DQN loss
-        loss = torch.nn.MSEloss(self._Q(s_t)[a_t], r_t +  np.max(self._Q.forward(s_t1),axis=1)) #ADD OPTIMIZER
+        loss = torch.nn.MSEloss(self._Q(s_t)[a_t], r_t +  self._gamma*np.max(self._Q.forward(s_t1).detach(),axis=1)) #ADD OPTIMIZER
         self._optimizer.zero_grad()
         loss.backward(self._Q.parameters())
         self._optimizer.step()
@@ -192,7 +192,7 @@ class DQNController:
 
         else:
             a = np.argmax(self._Q.forward(upcast(np.expand_dims(cur_state,axis=0)),[]))     
-            cur_action = a.data.cpu().numpy()
+            cur_action = a.data.cpu().numpy() #TODO:why this?
 
         return cur_action
 
@@ -200,7 +200,7 @@ class DQNController:
         ret = False
         #TODO: what to do when root controller
         # Return control to caller
-        if a == 0:
+        if a == 0 and not self._is_root:
             r = 0
             dur = 0
             done = False
@@ -213,8 +213,9 @@ class DQNController:
 
         # Make a subroutine call
         else:
-            sub_idx = a - 1
-            r, dur, done = self._controller_tree[subcontrollers[sub_idx]].act(env, self._id, self.)
+            if(self._is_root == False):
+                sub_idx = a - 1 #submodule calls start from action 1 if non root actor
+            r, dur, done = self._controller_tree[subcontrollers[sub_idx]].act(env, self._id, is_test=is_test)
 
         return r, dur, done, ret
 
