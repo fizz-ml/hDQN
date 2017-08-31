@@ -5,10 +5,6 @@ from torch import FloatTensor as FT
 import agent
 from replay_buffer import ExperienceReplay
 import numpy as np
-import dill
-from torch.utils.serialization import load_lua
-import model_defs.ddpg_models.mountain_cart.critic as critic
-import model_defs.ddpg_models.mountain_cart.actor as actor
 import random
 
 #Default hyperparameter values
@@ -41,7 +37,7 @@ class DQNController:
         return self.replay_buffer
     """
 
-    def __init__(self, config, controllers, env):
+    def __init__(self, config, env):
         """Constructor for the DDPG_agent
 
         Args:
@@ -59,49 +55,63 @@ class DQNController:
             A DDPGAgent object
         """
         super(DDPGAgent, self).__init__(auxiliary_losses)
-        #state_size + 1 because we append reward to the input
-        state_size = state_size + 1
-
         #Initialize experience replay buffer
         self.replay_buffer = ExperienceReplay(state_size, action_size, buffer_size)
-        #TODO make sure config has these things
-        
-        #parent id
+       
+        #tree metadata
         self._parent_ids = config['parent_ids'] #value of -1 indicates tree root  #subcontroller ids
-        subcontroller_ids = config['subcontroller_ids']
-        if subcontroller_ids = None:
+        self._subcontroller_ids = config['subcontroller_ids']
+        self._is_root = (self._parent_ids == None)#TODO
+
+        if (subcontroller_ids == None):
             self._true_actor = True
         else:
             self._true_actor = False
 
-        for idx in subcontroller_ids:
-            self.subcontrollers = []
+        #for idx in subcontroller_ids:
+        #    self.subcontrollers = []
 
-        #initialize parameters
+        #make sure config spits out these instead of hardcoding them
+        #controller parameters
         self.epsilon = 0.35
-        self._alpha = alpha
-        self.iter_count = iter_count
-        self._gamma = gamma
-        #TODO: config should have batch_size
+        self._alpha = config['alpha']
+        self.iter_count = config['iter_count']
+        self._gamma =config[' gamma']
         self._batch_size = config['batch_size']
         self._state_size = env.obs_size()
-       
+               
         if(self._true_actor):
             self._action_size = env.action_size() + 1
         else:
             self._action_size = len(subcontroller_ids) + 1 
+        if(self._is_root):
+            self._action_size = self._action_size - 1 #if root, no callback action needed
+        
+        
         #Specify model locations
-        self._critic_path = critic_path
-
-        self._Q = create_model(self._state_size, self._action_size, config['model_config']) #TODO merge these  config-like params nicely        
+        #self._critic_path = critic_path
+        self._Q = self.create_model(self._state_size, self._action_size) #TODO merge these  config-like params nicely        
 
 
         #initialize models
         #self.load_models()
 
-        #Initialize optimizers
+        #Initialize optimizer
         self._Q_optimizer = opt.Adam(self._Q.parameters(), lr=self._alpha)
-        self._is_root = config['is_root']#TODO
+    
+    
+    def create_model(self, state_size, action_size):
+        
+        model = torch.nn.Sequential(
+                    torch.nn.Linear(state_size, 50),
+                    torch.nn.ReLU(),
+                    torch.nn.Linear(50, 20),
+                    torch.nn.ReLU(),
+                    torch.nn.Linear(20, action_size),
+                    torch.nn.ReLU()
+                )
+        return model
+
     def train(self, q_caller = None):
         """Trains the agent for a bit.
 
@@ -117,25 +127,11 @@ class DQNController:
         
         s_t,a_t,r_t,s_t1,done,act_dur= self.replay_buffer.batch_sample(self._batch_size)
 
-        '''
-        loss_total = 0
-        argmax_t = np.empty((self._batch_size,1))
-        for j in range(self._batch_size):
-            
-            argmax = 0
-            for i in range(self._action_size):
-                if (self._Q.forward(s_next, i)> self._Q.forward(s_next, argmax)):
-                    argmax_t[j,1] = i
-
-                    #CONCAT STATE ACTIONS
-
-        '''
-
         #DQN loss
         loss = torch.nn.MSEloss(self._Q(s_t)[a_t], r_t +  self._gamma*np.max(self._Q.forward(s_t1).detach(),axis=1)) #ADD OPTIMIZER
-        self._optimizer.zero_grad()
+        self._Q_optimizer.zero_grad()
         loss.backward(self._Q.parameters())
-        self._optimizer.step()
+        self._Q_optimizer.step()
 
         
 
@@ -215,6 +211,9 @@ class DQNController:
         else:
             if(self._is_root == False):
                 sub_idx = a - 1 #submodule calls start from action 1 if non root actor
+            else:
+                sub_idx = a #if root
+
             r, dur, done = self._controller_tree[subcontrollers[sub_idx]].act(env, self._id, is_test=is_test)
 
         return r, dur, done, ret

@@ -1,5 +1,5 @@
 from environment import GymEnvironment
-from ddpg_agent import DDPGAgent
+#from ddpg_agent import DDPGAgent
 import numpy as np
 import sys
 import random
@@ -17,9 +17,14 @@ Each controller in the tree has:
 
 action 0 is reserved for callback to parent
 
+    0
+   / \
+  1   2
+ /\   /\
+3  4 5  6
 
 
-eg, controller_tree = [[1,2],[3,4],[5,6]]
+eg, controller_tree = [[1,2],[3,4],[5,6], [],[],[],[]]
     controller_network_configs = [config['0'], config['1'], config['2'], ...
                                     config[num_controllers -1]]
     
@@ -29,12 +34,25 @@ eg, controller_tree = [[1,2],[3,4],[5,6]]
 
 '''
 
+tree_config = [
+    {'subcontroller_ids':[1,2], 'parent_ids':None,'alpha':0.001, 'gamma':0.99, 'iter_count':20, 'batch_size': 20},
+    {'subcontroller_ids':None, 'parent_ids':0,'alpha':0.001, 'gamma':0.99 , 'iter_count':20, 'batch_size': 32},
+    {'subcontroller_ids':None, 'parent_ids':0, 'alpha':0.001, 'gamma':0.99, 'iter_count':20, 'batch_size':32}
+
+]
+
+global_config = {
+    'env': {'name': 'CartPole-v0' },
+    'subroutines':tree_config,
+    'train': {'episodes':100}
 
 
+}
 
+conf = global_config
 def main():
-    json_data = open(sys.argv[1]).read()
-    conf = json.loads(json_data)
+    #json_data = open(sys.argv[1]).read()
+    #conf = json.loads(json_data)
 
 
     run = Runner(conf['env'], conf['subroutines'])
@@ -42,7 +60,7 @@ def main():
 
 class Runner:
     def __init__(self, env_config, controller_configs):
-        self.env = GymEnvironment(name = env_config["name"])
+        self.env = GymEnvironment(name = env_config['name'])
         self.controllers = [] #controller is stored at index controller_id
         for config in controller_configs:
             c = DQNController(config,self.env)
@@ -52,14 +70,14 @@ class Runner:
 
 
     def train(self, train_config):
-        controllers[0].act(self.env)
+        self.controllers[0].act(self.env) #TODO: rn root controller should be at index 0
 
         episodes = train_config['episodes']
         for ep in range(episodes):
-            controllers[0].act(self.env,0)
+            self.controllers[0].act(self.env,0)
         
-        for c in controllers
-            c.train(controllers)
+        for c in self.controllers:
+            c.train()
             
 
 if __name__ == "__main__":
