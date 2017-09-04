@@ -37,7 +37,7 @@ class ExperienceReplay(ReplayBuffer):
         self.length  = 0
         self.capacity = capacity
 
-        self.actions = np.empty((self.capacity, self.action_size), dtype = np.float16)
+        self.actions = np.empty((self.capacity,1), dtype = np.int64)
         self.states = np.empty((self.capacity, self.state_size), dtype = np.float16)
         self.rewards = np.empty(self.capacity, dtype = np.float16)
         self.dones = np.empty(self.capacity, dtype = np.bool)
@@ -77,7 +77,7 @@ class ExperienceReplay(ReplayBuffer):
         r_t = np.expand_dims(self.rewards[idxs], axis = 1)
         done = self.dones[idxs]
         act_dur = self.act_durs[idxs]
-        caller_id = self.caller_ids[idxs]
+        #caller_id = self.caller_ids[idxs]
 
         '''
         j = 0
@@ -86,16 +86,16 @@ class ExperienceReplay(ReplayBuffer):
         print(s_t[j], s_t1[j], a_t[j], r_t[j], done[j])
         raw_input("Press Enter to continue...")
         '''
-        return s_t, a_t, r_t, s_t1, done, act_dur, caller_id
+        return s_t, a_t, r_t, s_t1, done, act_dur#, caller_id
 
     def put(self, s_t, a_t, reward, done, act_dur, caller_id):
         self.actions[self.current_index] = a_t
         self.states[self.current_index] = s_t
         self.rewards[self.current_index] = reward
         self.dones[self.current_index] = done
-        self.caller_ids[self.current_index] = caller_id
+        #self.caller_ids[self.current_index] = caller_id
         self.act_durs[self.current_index] = act_dur
-        self._icrement_index()
+        self._increment_index()
 
     def _increment_index(self):
         self.current_index = (self.current_index + 1) % self.capacity

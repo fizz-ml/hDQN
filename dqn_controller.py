@@ -54,40 +54,40 @@ class DQNController:
         Returns:
             A DDPGAgent object
         """
-        super(DDPGAgent, self).__init__(auxiliary_losses)
+        #super(DDPGAgent, self).__init__(auxiliary_losses)
         #Initialize experience replay buffer
-        self.replay_buffer = ExperienceReplay(state_size, action_size, buffer_size)
-       
         #tree metadata
         self._parent_ids = config['parent_ids'] #value of -1 indicates tree root  #subcontroller ids
         self._subcontroller_ids = config['subcontroller_ids']
         self._is_root = (self._parent_ids == None)#TODO
 
-        if (subcontroller_ids == None):
+        if (self._subcontroller_ids == None):
             self._true_actor = True
         else:
             self._true_actor = False
 
-        #for idx in subcontroller_ids:
-        #    self.subcontrollers = []
+        
 
         #make sure config spits out these instead of hardcoding them
         #controller parameters
         self.epsilon = 0.35
         self._alpha = config['alpha']
         self.iter_count = config['iter_count']
-        self._gamma =config[' gamma']
+        self._gamma =config['gamma']
         self._batch_size = config['batch_size']
-        self._state_size = env.obs_size()
-               
+        self._state_size = env.obs_size[0]
+        self._loss_fn = torch.nn.MSELoss() #TODO: add to config
+        buffer_size=50       
         if(self._true_actor):
-            self._action_size = env.action_size() + 1
+            self._action_size = env.action_size[0] + 1
         else:
-            self._action_size = len(subcontroller_ids) + 1 
+            self._action_size = len(self._subcontroller_ids) + 1 
         if(self._is_root):
             self._action_size = self._action_size - 1 #if root, no callback action needed
         
-        
+        self.replay_buffer = ExperienceReplay(self._state_size, self._action_size, buffer_size)
+       
+
         #Specify model locations
         #self._critic_path = critic_path
         self._Q = self.create_model(self._state_size, self._action_size) #TODO merge these  config-like params nicely        
@@ -128,34 +128,51 @@ class DQNController:
         s_t,a_t,r_t,s_t1,done,act_dur= self.replay_buffer.batch_sample(self._batch_size)
 
         #DQN loss
-        loss = torch.nn.MSEloss(self._Q(s_t)[a_t], r_t +  self._gamma*np.max(self._Q.forward(s_t1).detach(),axis=1)) #ADD OPTIMIZER
+        print('during train, action shape' + str(a_t.shape))
+        out = self._Q(upcast(s_t))[np.arange(self._batch_size), a_t.squeeze()]
+        out = out.unsqueeze(1)
+        
+        target =  upcast(r_t) + self._Q(upcast(s_t1)).max(1)[0].unsqueeze(1)
+        
+        #print(type(out))
+        #print(type(target))
+
+        import ipdb
+        #ipdb.set_trace()
+
+        #loss_fn = torch.nn.MSELoss()#upcast(out) -  upcast(target)) #ADD OPTIMIZER
+        loss_val = self._loss_fn(out, target.detach())
         self._Q_optimizer.zero_grad()
-        loss.backward(self._Q.parameters())
+        #ipdb.set_trace()
+        loss_val.backward()#self._Q.parameters())
+        
         self._Q_optimizer.step()
 
         
 
         #update_critic
         
-    def set_controller_tree(controller_tree):
+    def set_controller_tree(self,controller_tree):
         self._controller_tree = controller_tree
     
     def act(self,
             env,
-            caller_id,
             is_test=False):
         # Keep track of total reward and duration
         tot_r = 0
         tot_dur = 0
-
+        
         while True:
             # Forward step
             cur_state = env.cur_obs
+            #print(cur_state.shape)
             cur_action = self.choose_action(cur_state, is_test)
-            r, dur, done, ret = self.execute_action(env, cur_action)
+            #print('action shape while running')
+            #print(cur_action.shape)
+            r, dur, done, ret = self.execute_action(env, cur_action, is_test)
 
             # Store the tuple in replay
-            self.replay_buffer.put(cur_state, cur_action, r, done, dur, caller_id)
+            self.replay_buffer.put(cur_state, cur_action, r, done, dur, 0)#TODO
 
             # Update totals
             tot_r += r
@@ -184,18 +201,28 @@ class DQNController:
         cur_action = None
         
         if random.random() < self.epsilon and is_test == False:
-            cur_action = np.floor(np.expand_dims(np.random.randn(self._action_size),axis=0)).astype(int)
-
+            cur_action = np.floor(np.expand_dims(np.random.randn(self._action_size-1),axis=0)).astype(int)
+            cur_action = np.argmax(cur_action)
+            print('radn_action' + str(cur_action))
+            print('rand_action shape' + str(cur_action.shape))
         else:
-            a = np.argmax(self._Q.forward(upcast(np.expand_dims(cur_state,axis=0)),[]))     
-            cur_action = a.data.cpu().numpy() #TODO:why this?
+            #print(cur_state.shape)
+            out = self._Q.forward(upcast(np.expand_dims(cur_state,axis=0)))
+            #print(out.data.cpu().numpy())
+            
+            a = np.argmax(out.data.numpy())
+            print('greedy-action' + str(a))
+            print('gredy-action shape' + str(a.shape))
+            #a = np.argmax(self._Q.forward(upcast(np.expand_dims(cur_state,axis=0))))     
+            cur_action = a#a.data.cpu().numpy() #TODO:why this?
 
         return cur_action
 
     def execute_action(self, env, a, is_test):
         ret = False
-        #TODO: what to do when root controller
+        
         # Return control to caller
+        print('type a:' + str(type(a)))
         if a == 0 and not self._is_root:
             r = 0
             dur = 0
@@ -204,7 +231,9 @@ class DQNController:
 
         # Perform real actual action
         elif self._true_actor:
-            _, r, done = env.next_obs(a)
+            #print('true action shape ' +str(a.shape))
+            #print('true action' + str(a))
+            _, r, done = env.next_obs(a-1)  
             dur = 1
 
         # Make a subroutine call
@@ -214,7 +243,7 @@ class DQNController:
             else:
                 sub_idx = a #if root
 
-            r, dur, done = self._controller_tree[subcontrollers[sub_idx]].act(env, self._id, is_test=is_test)
+            r, dur, done = self._controller_tree[self._subcontroller_ids[sub_idx]].act(env, is_test=is_test)
 
         return r, dur, done, ret
 

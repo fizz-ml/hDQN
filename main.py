@@ -30,37 +30,43 @@ eg, controller_tree = [[1,2],[3,4],[5,6], [],[],[],[]]
     
      
 
-   
+Issues encountered: no guarantee batch_size sample will be available for training each controller    
 
 '''
 
+
+
+
 tree_config = [
-    {'subcontroller_ids':[1,2], 'parent_ids':None,'alpha':0.001, 'gamma':0.99, 'iter_count':20, 'batch_size': 20},
-    {'subcontroller_ids':None, 'parent_ids':0,'alpha':0.001, 'gamma':0.99 , 'iter_count':20, 'batch_size': 32},
-    {'subcontroller_ids':None, 'parent_ids':0, 'alpha':0.001, 'gamma':0.99, 'iter_count':20, 'batch_size':32}
+    {'subcontroller_ids':[1,2], 'parent_ids':None,'alpha':0.001, 'gamma':0.99, 'iter_count':20, 'batch_size': 16},
+    {'subcontroller_ids':None, 'parent_ids':0,'alpha':0.001, 'gamma':0.99 , 'iter_count':20, 'batch_size': 16},
+    {'subcontroller_ids':None, 'parent_ids':0, 'alpha':0.001, 'gamma':0.99, 'iter_count':20, 'batch_size':16}
 
 ]
 
 global_config = {
-    'env': {'name': 'CartPole-v0' },
+    'env': {'name': 'Acrobot-v1' },
     'subroutines':tree_config,
-    'train': {'episodes':100}
+    'train': {'episodes':500}
 
 
 }
 
 conf = global_config
+global_steps = 1000
 def main():
     #json_data = open(sys.argv[1]).read()
     #conf = json.loads(json_data)
 
 
     run = Runner(conf['env'], conf['subroutines'])
-    run.train(conf['train'])
+    for i in range(global_steps):
+        run.train(conf['train'])
 
 class Runner:
     def __init__(self, env_config, controller_configs):
         self.env = GymEnvironment(name = env_config['name'])
+        #self.env.reset()
         self.controllers = [] #controller is stored at index controller_id
         for config in controller_configs:
             c = DQNController(config,self.env)

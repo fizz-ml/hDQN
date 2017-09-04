@@ -43,7 +43,7 @@ class GymEnvironment(Environment):
         """
         self.env = gym.make(name)
         self.env = wrappers.Monitor(self.env, './results/cart_pole_1')
-        self._cur_obs = None
+        self._cur_obs = self.env.reset()
 
     def next_obs(self, cur_action, render = False):
         """ Runs a step in the gym environment.
