@@ -1,0 +1,6 @@
+*.mp4
+*.json
+__pycache__/
+__results__/
+
+

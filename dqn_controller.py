@@ -18,44 +18,19 @@ BATCH_SIZE = 100
 EPSILON = 0.01
 
 class DQNController:
-    """
-    Attributes:
-           replay_buffer: The DDPGAgent replay buffer
-    """
-
-    """
-    @property
-    def actor(self):
-        return self.actor
-
-    @property
-    def critic(self):
-        return self.critic
-
-    @property
-    def replay_buffer(self):
-        return self.replay_buffer
-    """
+   
 
     def __init__(self, config, env):
-        """Constructor for the DDPG_agent
+        """Constructor for the DQN Controller
 
         Args:
-            actor_path: location of the actor_t7
+            config: configuration dictionary for the controller
 
-            critic_path: location of the critic_t7
-
-            buffer_size: size of the replay buffer
-
-            alpha: The learning rate
-
-            gamma: The discount factor
+            env: environment wrapper            
 
         Returns:
-            A DDPGAgent object
+            A DQNController object
         """
-        #super(DDPGAgent, self).__init__(auxiliary_losses)
-        #Initialize experience replay buffer
         #tree metadata
         self._parent_ids = config['parent_ids'] #value of -1 indicates tree root  #subcontroller ids
         self._subcontroller_ids = config['subcontroller_ids']
@@ -68,9 +43,10 @@ class DQNController:
 
         
 
-        #make sure config spits out these instead of hardcoding them
-        #controller parameters
+        #TODO:make sure config spits out these instead of hardcoding them
+        
         self.epsilon = 0.35
+        self.decay_factor_epsilon = 0.95
         self._alpha = config['alpha']
         self.iter_count = config['iter_count']
         self._gamma =config['gamma']
@@ -78,6 +54,7 @@ class DQNController:
         self._state_size = env.obs_size[0]
         self._loss_fn = torch.nn.MSELoss() #TODO: add to config
         buffer_size=50       
+        
         if(self._true_actor):
             self._action_size = env.action_size[0] + 1
         else:
@@ -88,13 +65,8 @@ class DQNController:
         self.replay_buffer = ExperienceReplay(self._state_size, self._action_size, buffer_size)
        
 
-        #Specify model locations
-        #self._critic_path = critic_path
+        
         self._Q = self.create_model(self._state_size, self._action_size) #TODO merge these  config-like params nicely        
-
-
-        #initialize models
-        #self.load_models()
 
         #Initialize optimizer
         self._Q_optimizer = opt.Adam(self._Q.parameters(), lr=self._alpha)
@@ -120,7 +92,7 @@ class DQNController:
             Returns:
                 None
         """
-        self.epsilon = self.epsilon * 0.99992 #TODO prove this is optimal
+        self.epsilon = self.epsilon * self.decay_factor_epsilon #TODO prove this is optimal
 
 
         #get argmax_a' Q(s,a')
@@ -201,20 +173,13 @@ class DQNController:
         cur_action = None
         
         if random.random() < self.epsilon and is_test == False:
-            cur_action = np.floor(np.expand_dims(np.random.randn(self._action_size-1),axis=0)).astype(int)
-            cur_action = np.argmax(cur_action)
-            print('radn_action' + str(cur_action))
-            print('rand_action shape' + str(cur_action.shape))
+            cur_action = np.random.randint(self._action_size)
+           
         else:
-            #print(cur_state.shape)
-            out = self._Q.forward(upcast(np.expand_dims(cur_state,axis=0)))
-            #print(out.data.cpu().numpy())
             
+            out = self._Q.forward(upcast(np.expand_dims(cur_state,axis=0))).detach()
             a = np.argmax(out.data.numpy())
-            print('greedy-action' + str(a))
-            print('gredy-action shape' + str(a.shape))
-            #a = np.argmax(self._Q.forward(upcast(np.expand_dims(cur_state,axis=0))))     
-            cur_action = a#a.data.cpu().numpy() #TODO:why this?
+            cur_action = a 
 
         return cur_action
 
@@ -222,7 +187,7 @@ class DQNController:
         ret = False
         
         # Return control to caller
-        print('type a:' + str(type(a)))
+        
         if a == 0 and not self._is_root:
             r = 0
             dur = 0
@@ -231,8 +196,6 @@ class DQNController:
 
         # Perform real actual action
         elif self._true_actor:
-            #print('true action shape ' +str(a.shape))
-            #print('true action' + str(a))
             _, r, done = env.next_obs(a-1)  
             dur = 1
 

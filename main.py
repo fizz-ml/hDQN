@@ -38,16 +38,16 @@ Issues encountered: no guarantee batch_size sample will be available for trainin
 
 
 tree_config = [
-    {'subcontroller_ids':[1,2], 'parent_ids':None,'alpha':0.001, 'gamma':0.99, 'iter_count':20, 'batch_size': 16},
-    {'subcontroller_ids':None, 'parent_ids':0,'alpha':0.001, 'gamma':0.99 , 'iter_count':20, 'batch_size': 16},
-    {'subcontroller_ids':None, 'parent_ids':0, 'alpha':0.001, 'gamma':0.99, 'iter_count':20, 'batch_size':16}
+    {'subcontroller_ids':[1,2], 'parent_ids':None,'alpha':0.001, 'gamma':0.99, 'iter_count':20, 'batch_size': 50},
+    {'subcontroller_ids':None, 'parent_ids':0,'alpha':0.001, 'gamma':0.99 , 'iter_count':20, 'batch_size': 50},
+    {'subcontroller_ids':None, 'parent_ids':0, 'alpha':0.001, 'gamma':0.99, 'iter_count':20, 'batch_size':50}
 
 ]
 
 global_config = {
     'env': {'name': 'Acrobot-v1' },
     'subroutines':tree_config,
-    'train': {'episodes':500}
+    'train': {'episodes':1000}
 
 
 }
