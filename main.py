@@ -11,26 +11,30 @@ from dqn_controller import DQNController
 The hierarchy is specified by a tree list
 
 Each controller in the tree has:
-    a unique id, 
+    a unique id (integer from 0 to num_total_controllers-1), 
     list of sub-controller ids,
     parent id
 
-action 0 is reserved for callback to parent
+The tree needs to be specified in tree_config
+E.g, for the following controller tree, tree_config could look like
+
+
+tree_config = [
+    {'subcontroller_ids':[1,2], 'parent_ids':None,'alpha':0.001, 'gamma':0.99, 'iter_count':20, 'batch_size': 50},
+    {'subcontroller_ids':None, 'parent_ids':0,'alpha':0.001, 'gamma':0.99 , 'iter_count':20, 'batch_size': 50},
+    {'subcontroller_ids':None, 'parent_ids':0, 'alpha':0.001, 'gamma':0.99, 'iter_count':20, 'batch_size':50}
+
+]
+
+
 
     0
    / \
   1   2
- /\   /\
-3  4 5  6
 
 
-eg, controller_tree = [[1,2],[3,4],[5,6], [],[],[],[]]
-    controller_network_configs = [config['0'], config['1'], config['2'], ...
-                                    config[num_controllers -1]]
-    
-     
 
-Issues encountered: no guarantee batch_size sample will be available for training each controller    
+Issues encountered: no guarantee batch_size-size sample will be available for training each controller    
 
 '''
 
