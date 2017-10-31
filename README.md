@@ -2,14 +2,12 @@
 hierarchical DQN
 
 
-
-
-
 Please go to `main.py` to see usage
 
 
 
-##Issues;
+## Issues
 
-- No guarantee that enough training data is available for each controller
+- Hyperparam search needed on Acrobot
+- Trying different problems to see how rewards/loss scales with hierarchy
 
